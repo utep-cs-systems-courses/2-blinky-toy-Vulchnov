@@ -1,5 +1,6 @@
 #include <msp430.h>
 #include "libTimer.h"
+#include "buzzer.h"
 
 #define LED_RED BIT0               // P1.0
 #define LED_GREEN BIT6             // P1.6
@@ -15,7 +16,8 @@ void main(void)
 {  
   configureClocks();
   enableWDTInterrupts();
-
+  buzzer_init();
+  
   P1DIR |= LEDS;
   P1OUT &= ~LEDS;		/* leds initially off */
   
@@ -28,11 +30,12 @@ void main(void)
 }
 char beatmax = 3;
 char pushed = 0;
+double tempo = 60;
 void
 switch_interrupt_handler()
 {
   char p1val = P2IN;		/* switch is in P1 */
-
+  
 /* update switch interrupt sense to detect changes from current buttons */
   P2IES |= (p1val & SWITCHES);	/* if switch up, sense down */
   P2IES &= (p1val | ~SWITCHES);	/* if switch down, sense up */
@@ -43,8 +46,43 @@ switch_interrupt_handler()
   } else {
     if(pushed);
     else{
-    beatmax++;
-    pushed=1;
+      if(beatmax>1){
+	beatmax--;
+	pushed = 1;
+      }
+    }
+  }
+  if (p1val & SW2) {
+    pushed = 0;
+  } else {
+    if(pushed);
+    else{
+      if(beatmax<5){
+	beatmax++;
+	pushed = 1;
+      }
+    }
+  }
+  if (p1val & SW3) {
+    pushed = 0;
+  } else {
+    if(pushed);
+    else{
+      if(tempo>30){
+	tempo -= 5;
+	pushed = 1;
+      }
+    }
+  }
+  if (p1val & SW4) {
+    pushed = 0;
+  } else {
+    if(pushed);
+    else{ 
+      if(tempo<240){
+	tempo += 5;
+	pushed = 1;
+      }
     }
   }
 }
@@ -61,20 +99,23 @@ char beat = 3;
 int count = 0;
 void
 __interrupt_vec(WDT_VECTOR) WDT(){
-  if(count>=250){
-    if (beat==beatmax){
+  if(count>=(250/(tempo/60))){
+    if (beat>=beatmax){
       P1OUT |= LED_RED;
+      buzzer_set_period(1000);
       beat=0;
     }
     else{
       P1OUT |=LED_GREEN;
+      buzzer_set_period(2000);
       beat++;
     }
     count=0;
   }
-  if(count>50){
+  if(count>10){
     P1OUT &= ~LED_RED;
     P1OUT &= ~LED_GREEN;
+    buzzer_set_period(10);
   }
   count++;
 }

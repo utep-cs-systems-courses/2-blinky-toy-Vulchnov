@@ -1,0 +1,8 @@
+#ifndef led_included
+#define led_included
+
+void led_init();
+void toggleRed();
+void toggleGreen();
+
+#endif

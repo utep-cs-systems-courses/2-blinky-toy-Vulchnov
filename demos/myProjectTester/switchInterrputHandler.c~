@@ -1,5 +1,7 @@
 #include <msp430.h>
 #include "libTimer.h"
+#include "buzzer.h"
+#include "stateMachine.h"
 
 #define LED_RED BIT0               // P1.0
 #define LED_GREEN BIT6             // P1.6
@@ -15,7 +17,8 @@ void main(void)
 {  
   configureClocks();
   enableWDTInterrupts();
-
+  buzzer_init();
+  
   P1DIR |= LEDS;
   P1OUT &= ~LEDS;		/* leds initially off */
   
@@ -26,13 +29,12 @@ void main(void)
 
   or_sr(0x18);  // CPU off, GIE on
 }
-char beatmax = 3;
 char pushed = 0;
 void
 switch_interrupt_handler()
 {
   char p1val = P2IN;		/* switch is in P1 */
-
+  
 /* update switch interrupt sense to detect changes from current buttons */
   P2IES |= (p1val & SWITCHES);	/* if switch up, sense down */
   P2IES &= (p1val | ~SWITCHES);	/* if switch down, sense up */
@@ -43,8 +45,35 @@ switch_interrupt_handler()
   } else {
     if(pushed);
     else{
-    beatmax++;
-    pushed=1;
+      decreaseBeatMax();
+      pushed = 1;
+    }
+  }
+  if (p1val & SW2) {
+    pushed = 0;
+  } else {
+    if(pushed);
+    else{
+      increaseBeatMax();
+      pushed = 1;
+    }
+  }
+  if (p1val & SW3) {
+    pushed = 0;
+  } else {
+    if(pushed);
+    else{
+      decreaseTempo();
+      pushed = 1;
+    }
+  }
+  if (p1val & SW4) {
+    pushed = 0;
+  } else {
+    if(pushed);
+    else{ 
+      increaseTempo();
+      pushed = 1;
     }
   }
 }
@@ -56,25 +85,4 @@ __interrupt_vec(PORT2_VECTOR) Port_2(){
     P2IFG &= ~SWITCHES;		      /* clear pending sw interrupts */
     switch_interrupt_handler();	/* single handler for all switches */
   }
-}
-char beat = 3;
-int count = 0;
-void
-__interrupt_vec(WDT_VECTOR) WDT(){
-  if(count>=250){
-    if (beat==beatmax){
-      P1OUT |= LED_RED;
-      beat=0;
-    }
-    else{
-      P1OUT |=LED_GREEN;
-      beat++;
-    }
-    count=0;
-  }
-  if(count>50){
-    P1OUT &= ~LED_RED;
-    P1OUT &= ~LED_GREEN;
-  }
-  count++;
 }
